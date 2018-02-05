@@ -46,6 +46,9 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     private static final int CAMERA_PERMISSION_CODE = 3;//相机权限请求码
     private static final int ALBUM_PERMISSION_CODE = 4;//相册权限请求码
 
+    private String[] cameraPerms = {Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
+    private String[] capturePerms = {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -54,16 +57,18 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     }
 
     private void initView() {
-        ivHeader = (ImageView) findViewById(R.id.iv_header);
+        ivHeader = findViewById(R.id.iv_header);
         if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
             filePath = Environment.getExternalStorageDirectory().getAbsolutePath();
         }
         //首次进入先查找文件中是否有之前保存的头像文件，有则显示，然后调用后台接口刷新图片
         File file = new File(filePath + "/header/" + userId + ".jpg");
         if (file.exists()) {
-            Log.e(TAG, "====initView: 文件存在" );
+            Log.e(TAG, "====initView: 文件存在");
             Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
-            ivHeader.setImageBitmap(bitmap);
+            if (bitmap != null) {
+                ivHeader.setImageBitmap(bitmap);
+            }
         }
         //请求服务器，下载头像图片，刷新UI，以服务器的为准（因为可能在另一部手机做了修改，这时本地缓存的就不准了）
     }
@@ -74,7 +79,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             case R.id.btn_camera:
                 //需要相机，读写存储权限
                 //检查是否已经有了权限
-                String[] cameraPerms = {Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
                 if (EasyPermissions.hasPermissions(this, cameraPerms)) {
                     //已经有了相关权限，发起系统相机调用
                     requestCamera();
@@ -87,7 +91,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             case R.id.btn_capture:
                 //读写存储权限
                 //检查是否已经有了权限
-                String[] capturePerms = {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
                 if (EasyPermissions.hasPermissions(this, capturePerms)) {
                     //已经有了相关权限，发起系统相册调用
                     requestAlbum();
@@ -240,28 +243,47 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults,this);
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
 
     }
 
 
     @Override
     public void onPermissionsGranted(int requestCode, List<String> perms) {
+        Log.e(TAG, "=======onPermissionsGranted: ");
         switch (requestCode) {
             case CAMERA_PERMISSION_CODE:
-                requestCamera();
+                if (EasyPermissions.hasPermissions(this,cameraPerms)){
+                    requestCamera();
+                }
                 break;
             case ALBUM_PERMISSION_CODE:
-                requestAlbum();
+                if (EasyPermissions.hasPermissions(this,capturePerms)){
+                    requestAlbum();
+                }
                 break;
         }
+
     }
 
     @Override
     public void onPermissionsDenied(int requestCode, List<String> perms) {
+        Log.e(TAG, "=======onPermissionsDenied: ");
         if (EasyPermissions.somePermissionPermanentlyDenied(this, perms)) {
+            //点击了不再询问
+            Log.e(TAG, "=======onPermissionsDenied:内内 ");
             new AppSettingsDialog.Builder(this).build().show();
+        } else {
+            switch (requestCode) {
+                case CAMERA_PERMISSION_CODE:
+                    EasyPermissions.requestPermissions(this, "需要相机和存储权限，否则无法使用拍照功能", CAMERA_PERMISSION_CODE, cameraPerms);
+                    break;
+                case ALBUM_PERMISSION_CODE:
+                    EasyPermissions.requestPermissions(this, "需要存储权限，否则无法使用相册功能", ALBUM_PERMISSION_CODE, capturePerms);
+                    break;
+            }
+
         }
     }
 }
